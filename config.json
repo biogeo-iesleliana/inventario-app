@@ -5,8 +5,8 @@
   "cifrado": {
     "kdf": "PBKDF2-SHA256",
     "iter": 600000,
-    "salt": "q+R1kJFDYEXw8dvYqJfGcw==",
-    "iv": "cG+VPscgFD5JBZ4A",
-    "data": "B3gypDNM1/GWzmF3IVEoRbrDhsOSV4ei9G7RvkaBIX1ioaEHklHRl29vj1dLhjEvlE6fZU8JRen8/1+lTy7DbC5AvnECHXFroOo/y/VVbx5TIetCGHPHE7ctMBpEegJ7D+xD3wZm8ZJ8tsx0lg=="
+    "salt": "22CLpOrWIBMHYD+vpKKyyA==",
+    "iv": "zuHeBzVOgIDBsK2O",
+    "data": "s1nUiEZ2ZR9L2F8TtwuHM+F8XNMNVAd5gIk6SB58jbStTezJDsMf8dFUOm2uPCYJy0yF0Bn07Qcj2C43H9vDXE5N6Jn3gvsEWTcBM4+o043vQVe2mvjt7WjVipSjK7K4h2kN2yzpst+4RR6Ouw=="
   }
 }
