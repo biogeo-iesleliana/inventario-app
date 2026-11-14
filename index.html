@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Inventario · Biología y Geología</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <!-- Pantalla de acceso -->
+  <section id="v-login" class="view login" hidden>
+    <div class="login-box">
+      <h1>Inventario del departamento</h1>
+      <p class="muted">Biología y Geología · IES L'Eliana</p>
+      <form id="f-login" autocomplete="off">
+        <label for="login-pass">Contraseña del departamento</label>
+        <input id="login-pass" type="password" required autocomplete="current-password">
+        <label class="check"><input id="login-remember" type="checkbox"> Recordar en este dispositivo</label>
+        <button class="btn" type="submit">Entrar</button>
+        <p id="login-msg" class="msg" role="status"></p>
+      </form>
+      <p class="muted small">¿Primera vez? <a href="#configurar" id="go-setup">Configurar el acceso</a></p>
+    </div>
+  </section>
+
+  <!-- Configuración inicial (genera config.json) -->
+  <section id="v-setup" class="view login" hidden>
+    <div class="login-box wide">
+      <h1>Configurar el acceso</h1>
+      <p>Esta pantalla cifra el token de GitHub con la contraseña del departamento. El token no sale de este navegador; solo se genera el archivo <code>config.json</code> que hay que subir al repositorio <code>inventario-app</code>.</p>
+      <form id="f-setup" autocomplete="off">
+        <label for="s-owner">Organización</label>
+        <input id="s-owner" value="biogeo-iesleliana" required>
+        <label for="s-repo">Repositorio de datos (privado)</label>
+        <input id="s-repo" value="inventario-datos" required>
+        <label for="s-branch">Rama</label>
+        <input id="s-branch" value="main" required>
+        <label for="s-token">Token de GitHub (fine-grained, solo inventario-datos, Contents: read and write)</label>
+        <input id="s-token" type="password" required autocomplete="off">
+        <label for="s-pass">Contraseña del departamento (mínimo 16 caracteres; mejor una frase)</label>
+        <input id="s-pass" type="password" minlength="16" required autocomplete="new-password">
+        <label for="s-pass2">Repite la contraseña</label>
+        <input id="s-pass2" type="password" minlength="16" required autocomplete="new-password">
+        <button class="btn" type="submit">Comprobar token y generar config.json</button>
+        <p id="setup-msg" class="msg" role="status"></p>
+      </form>
+      <div id="setup-out" hidden>
+        <p><strong>Listo.</strong> Copia este contenido en el archivo <code>config.json</code> del repositorio <code>inventario-app</code> (sustituyendo el que haya) y guarda el cambio. En un par de minutos ya podrás entrar con la contraseña.</p>
+        <textarea id="setup-json" rows="8" readonly></textarea>
+        <div class="row"><button class="btn" id="setup-copy" type="button">Copiar</button><button class="btn ghost" id="setup-download" type="button">Descargar config.json</button><a class="btn ghost" href="#">Volver</a></div>
+      </div>
+      <p class="muted small"><a href="#">Volver a la pantalla de acceso</a></p>
+    </div>
+  </section>
+
+  <!-- Aplicación -->
+  <div id="v-main" class="view" hidden>
+    <header class="top">
+      <div class="brand"><strong>Inventario</strong><span class="muted"> · Biología y Geología</span></div>
+      <nav class="tabs" aria-label="Secciones">
+        <a href="#inventario" data-tab="inventario">Inventario</a>
+        <a href="#reactivos" data-tab="reactivos">Catálogo de reactivos</a>
+        <a href="#importar" data-tab="importar">Importar</a>
+        <a href="#listados" data-tab="listados">Listados</a>
+        <a href="#ajustes" data-tab="ajustes">Ajustes</a>
+      </nav>
+      <div class="who">
+        <label for="who-sel" class="sr">Registrado por</label>
+        <select id="who-sel" title="Registrado por"></select>
+        <button class="btn ghost small" id="btn-logout" type="button">Salir</button>
+      </div>
+    </header>
+    <div id="sync" class="sync" role="status"></div>
+    <main id="content"></main>
+  </div>
+
+  <!-- Diálogo genérico -->
+  <dialog id="dlg"><form method="dialog" id="dlg-form"><div id="dlg-body"></div></form></dialog>
+  <div id="print-area" aria-hidden="true"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="js/app.js" type="module"></script>
+</body>
+</html>
