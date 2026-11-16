@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Inventario · Biología y Geología</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css">
+<meta name="referrer" content="no-referrer">
+<!-- La página solo puede cargar sus propios archivos y hablar con la API de GitHub: ningún tercero recibe datos ni puede inyectar código. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; worker-src 'self' blob:; base-uri 'none'">
+<link rel="stylesheet" href="css/app.css?v=1.1.0">
 </head>
 <body>
 <div id="app">
@@ -20,8 +21,10 @@
         <label for="login-pass">Contraseña del departamento</label>
         <input id="login-pass" type="password" required autocomplete="current-password">
         <label class="check"><input id="login-remember" type="checkbox"> Recordar en este dispositivo</label>
+        <p class="muted small" style="margin:4px 0 0 26px">Solo en tu ordenador o móvil personal; nunca en equipos de aula o compartidos.</p>
         <button class="btn" type="submit">Entrar</button>
         <p id="login-msg" class="msg" role="status"></p>
+        <button class="btn ghost" id="login-retry" type="button" hidden>Reintentar la conexión</button>
       </form>
       <p class="muted small">¿Primera vez? <a href="#configurar" id="go-setup">Configurar el acceso</a></p>
     </div>
@@ -41,6 +44,8 @@
         <input id="s-branch" value="main" required>
         <label for="s-token">Token de GitHub (fine-grained, solo inventario-datos, Contents: read and write)</label>
         <input id="s-token" type="password" required autocomplete="off">
+        <label for="s-caduca">Fecha de caducidad del token (opcional; la app avisará un mes antes)</label>
+        <input id="s-caduca" type="date">
         <label for="s-pass">Contraseña del departamento (mínimo 16 caracteres; mejor una frase)</label>
         <input id="s-pass" type="password" minlength="16" required autocomplete="new-password">
         <label for="s-pass2">Repite la contraseña</label>
@@ -63,6 +68,7 @@
       <div class="brand"><strong>Inventario</strong><span class="muted"> · Biología y Geología</span></div>
       <nav class="tabs" aria-label="Secciones">
         <a href="#inventario" data-tab="inventario">Inventario</a>
+        <a href="#avisos" data-tab="avisos">Avisos <span class="badge" id="badge" hidden></span></a>
         <a href="#reactivos" data-tab="reactivos">Catálogo de reactivos</a>
         <a href="#importar" data-tab="importar">Importar</a>
         <a href="#listados" data-tab="listados">Listados</a>
@@ -71,18 +77,19 @@
       <div class="who">
         <label for="who-sel" class="sr">Registrado por</label>
         <select id="who-sel" title="Registrado por"></select>
+        <button class="btn ghost small" id="btn-refresh" type="button" title="Volver a leer los datos de GitHub">Actualizar</button>
         <button class="btn ghost small" id="btn-logout" type="button">Salir</button>
       </div>
     </header>
     <div id="sync" class="sync" role="status"></div>
     <main id="content"></main>
+    <footer class="foot muted small">Inventario del departamento · <span id="ver"></span></footer>
   </div>
 
   <!-- Diálogo genérico -->
   <dialog id="dlg"><form method="dialog" id="dlg-form"><div id="dlg-body"></div></form></dialog>
   <div id="print-area" aria-hidden="true"></div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-<script src="js/app.js" type="module"></script>
+<script src="js/app.js?v=1.1.0" type="module"></script>
 </body>
 </html>

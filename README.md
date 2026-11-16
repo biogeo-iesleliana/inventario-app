@@ -11,9 +11,16 @@ Aplicación web del inventario de material, equipos, reactivos y colecciones del
 |---|---|
 | `index.html` | Página de la app |
 | `css/app.css` | Estilos |
-| `js/app.js` | Toda la lógica: acceso, inventario, fichas, catálogo, importación, listados y ajustes |
-| `config.json` | Organización, repositorio de datos y token cifrado. Se genera desde la pantalla «Configurar el acceso» |
+| `js/app.js` | Arranque, acceso, inventario, fichas y avisos |
+| `js/core.js` | Núcleo: cifrado, API de GitHub, guardado con reintento, diálogos y reglas del inventario |
+| `js/vistas.js` | Catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes |
+| `js/xlsx-mini.js` | Generador de archivos Excel propio (sin librerías externas) |
+| `js/pdf-import.js` | Lectura local de PDF y reconstrucción de las columnas |
+| `vendor/` | PDF.js (Mozilla, licencia Apache 2.0). Solo se carga al importar un PDF |
+| `config.json` | Organización, repositorio de datos, token cifrado y fecha de caducidad. Se genera desde «Configurar el acceso» |
 | `.nojekyll` | Indica a GitHub Pages que publique los archivos tal cual |
+
+La app no carga nada de terceros: solo sus propios archivos y la API de GitHub (lo impone la política de seguridad de `index.html`).
 
 ## Cambiar la contraseña o renovar el token
 1. Entra en la app y ve a **Ajustes → Configurar el acceso** (o abre la app con `#configurar` al final de la dirección).
