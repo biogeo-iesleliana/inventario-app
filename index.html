@@ -6,9 +6,10 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Inventario · Biología y Geología</title>
 <meta name="referrer" content="no-referrer">
-<!-- La página solo puede cargar sus propios archivos y hablar con la API de GitHub: ningún tercero recibe datos ni puede inyectar código. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; worker-src 'self' blob:; base-uri 'none'">
-<link rel="stylesheet" href="css/app.css?v=1.1.0">
+<!-- La página solo puede cargar sus propios archivos y hablar con la API de GitHub: ningún tercero recibe datos ni puede inyectar código.
+     'wasm-unsafe-eval' permite ejecutar el lector de etiquetas (WebAssembly) incluido en vendor/tesseract; no abre la puerta a código de fuera. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; worker-src 'self' blob:; base-uri 'none'">
+<link rel="stylesheet" href="css/app.css?v=1.2.0">
 </head>
 <body>
 <div id="app">
@@ -70,6 +71,7 @@
         <a href="#inventario" data-tab="inventario">Inventario</a>
         <a href="#avisos" data-tab="avisos">Avisos <span class="badge" id="badge" hidden></span></a>
         <a href="#reactivos" data-tab="reactivos">Catálogo de reactivos</a>
+        <a href="#foto" data-tab="foto">Alta por foto</a>
         <a href="#importar" data-tab="importar">Importar</a>
         <a href="#listados" data-tab="listados">Listados</a>
         <a href="#ajustes" data-tab="ajustes">Ajustes</a>
@@ -90,6 +92,6 @@
   <dialog id="dlg"><form method="dialog" id="dlg-form"><div id="dlg-body"></div></form></dialog>
   <div id="print-area" aria-hidden="true"></div>
 </div>
-<script src="js/app.js?v=1.1.0" type="module"></script>
+<script src="js/app.js?v=1.2.0" type="module"></script>
 </body>
 </html>

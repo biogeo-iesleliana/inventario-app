@@ -1,0 +1,85 @@
+# Descarga Tesseract.js (lector de texto que funciona dentro del navegador) y lo copia en vendor/tesseract,
+# para que la app lo sirva desde GitHub Pages sin cargar nada de terceros.
+# Se ejecuta a mano, una sola vez (o para actualizarlo): pestaña Actions → «Instalar el lector de etiquetas (OCR)» → Run workflow.
+name: Instalar el lector de etiquetas (OCR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión principal de tesseract.js"
+        default: "6"
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: instalar-ocr
+  cancel-in-progress: false
+
+jobs:
+  instalar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Descargar tesseract.js desde npm (npm comprueba la integridad de cada paquete)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || { echo "Versión no válida: $VERSION"; exit 1; }
+          mkdir -p /tmp/ocr && cd /tmp/ocr
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund --ignore-scripts "tesseract.js@$VERSION"
+          test -f node_modules/tesseract.js/dist/tesseract.min.js
+          test -f node_modules/tesseract.js/dist/worker.min.js
+          ls node_modules/tesseract.js-core/tesseract-core*.wasm.js > /dev/null
+
+      - name: Copiar los archivos a vendor/tesseract
+        run: |
+          set -euo pipefail
+          D="$GITHUB_WORKSPACE/vendor/tesseract"; M=/tmp/ocr/node_modules
+          rm -f "$D"/tesseract.min.js "$D"/worker.min.js; rm -rf "$D/core"
+          mkdir -p "$D/core" "$D/lang"
+          cp "$M/tesseract.js/dist/tesseract.min.js" "$M/tesseract.js/dist/worker.min.js" "$D/"
+          cp "$M"/tesseract.js-core/tesseract-core*.wasm.js "$D/core/"
+          cp "$M/tesseract.js/LICENSE.md" "$D/LICENSE-tesseract.js.md" 2>/dev/null || cp "$M/tesseract.js/LICENSE" "$D/LICENSE-tesseract.js" 2>/dev/null || true
+          cp "$M/tesseract.js-core/LICENSE" "$D/LICENSE-tesseract.js-core" 2>/dev/null || true
+          # Datos de idioma: ya vienen en el repositorio (tessdata_fast, español e inglés). Solo se descargan si faltan.
+          for l in spa eng; do
+            if [ ! -s "$D/lang/$l.traineddata.gz" ]; then
+              curl -fsSL "https://github.com/tesseract-ocr/tessdata_fast/raw/main/$l.traineddata" | gzip -9 > "$D/lang/$l.traineddata.gz"
+            fi
+          done
+          {
+            echo "Instalado el $(date -u +%Y-%m-%d) por GitHub Actions"
+            echo "tesseract.js $(node -p "require('$M/tesseract.js/package.json').version")"
+            echo "tesseract.js-core $(node -p "require('$M/tesseract.js-core/package.json').version")"
+            echo
+            echo "SHA-256:"
+            cd "$D" && sha256sum tesseract.min.js worker.min.js core/* lang/*
+          } > "$D/VERSIONES.txt"
+          cat "$D/VERSIONES.txt"
+
+      - name: Guardar en el repositorio
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor/tesseract
+          if git diff --cached --quiet; then echo "Sin cambios: el lector ya estaba instalado."; exit 0; fi
+          git commit -m "Instala el lector de etiquetas (tesseract.js) en vendor/tesseract"
+          git push
+
+      - name: Publicar en GitHub Pages
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" > /dev/null && echo "Publicación solicitada."

@@ -1,7 +1,7 @@
-// Inventario del Departamento de Biología y Geología — núcleo compartido (v1.1)
+// Inventario del Departamento de Biología y Geología — núcleo compartido (v1.2)
 // Utilidades, estado, cifrado, API de GitHub, diálogos y reglas del inventario.
 
-export const VERSION = "1.1.0";
+export const VERSION = "1.2.0";
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 export const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -12,6 +12,8 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 // Fecha y hora LOCALES (antes se guardaban en UTC y el historial salía con una o dos horas de menos)
 export const today = () => ymd(new Date());
 export const nowISO = () => { const d = new Date(); return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+// «2028-05» → «2028-05-31» (las etiquetas suelen dar solo mes y año de caducidad)
+export const finMes = f => { const m = /^(\d{4})-(\d{2})$/.exec(f || ""); return m ? `${f}-${pad(new Date(+m[1], +m[2], 0).getDate())}` : f || ""; };
 export const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
 export const newId = () => "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -19,10 +21,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const TIPOS = ["Equipo / mobiliario inventariable", "Material de laboratorio reutilizable", "Material fungible", "Reactivos", "Colecciones"];
 export const ESTADOS = ["Operativo", "Deteriorado", "En reparación", "Pendiente de n.º de referencia", "De baja"];
 export const GHS = { GHS01: "Explosivo", GHS02: "Inflamable", GHS03: "Comburente", GHS04: "Gas a presión", GHS05: "Corrosivo", GHS06: "Toxicidad aguda", GHS07: "Nocivo / irritante", GHS08: "Peligro para la salud", GHS09: "Peligro para el medio ambiente" };
-export const FILES = { inv: "data/inventario.json", listas: "data/listas.json", cat: "data/catalogo-reactivos.json" };
+export const FILES = { inv: "data/inventario.json", listas: "data/listas.json", cat: "data/catalogo-reactivos.json", eq: "data/equivalencias.json" };
 export const NOMBRES = { ref: "referencia", tipo: "tipo", categoria: "categoría", denominacion: "denominación", especificacion: "especificación", marca: "marca", cantidad: "cantidad", ubicacion: "ubicación", armario: "armario", estado: "estado", origen: "origen", proveedor: "proveedor", codigoProveedor: "código del proveedor", factura: "factura", precio: "precio", fechaAlta: "fecha de alta", fechaBaja: "fecha de baja", motivoBaja: "motivo de baja", observaciones: "observaciones" };
 
-export const S = { cfg: null, token: null, inv: null, listas: null, cat: [], sha: {}, cargado: 0, dirty: false, route: () => { },
+export const S = { cfg: null, token: null, inv: null, listas: null, cat: [], eq: null, sha: {}, cargado: 0, dirty: false, route: () => { },
   filtros: { q: "", tipo: "", cat: "", ubic: "", estado: "activos" }, orden: { k: "denominacion", dir: 1 }, sel: new Map(), marcados: new Set() };
 
 /* ---------- base64 / cifrado ---------- */
@@ -93,7 +95,7 @@ async function ghPut(file, obj, sha, message) {
   if (!r.ok) throw ghError(r.status);
   return { sha: (await r.json()).content.sha };
 }
-const VACIO = { inv: () => ({ version: 1, items: [] }), listas: () => ({}), cat: () => [] };
+const VACIO = { inv: () => ({ version: 1, items: [] }), listas: () => ({}), cat: () => [], eq: () => ({ version: 1, codigos: {} }) };
 // Guarda aplicando un cambio sobre la versión más reciente del archivo; si otra persona guardó a la vez, relee y reintenta.
 export async function commit(key, mutate, message) {
   const file = FILES[key];
@@ -124,10 +126,11 @@ export async function guard(fn, okMsg) {
 export async function loadAll() {
   sync("Cargando el inventario desde GitHub…");
   try {
-    const [inv, listas, cat] = await Promise.all([ghGet(FILES.inv), ghGet(FILES.listas), ghGet(FILES.cat)]);
+    const [inv, listas, cat, eq] = await Promise.all([ghGet(FILES.inv), ghGet(FILES.listas), ghGet(FILES.cat), ghGet(FILES.eq)]);
     S.inv = inv.data || VACIO.inv(); S.sha.inv = inv.sha;
     S.listas = listas.data || {}; S.sha.listas = listas.sha;
     S.cat = Array.isArray(cat.data) ? cat.data : [];
+    S.eq = eq.data || VACIO.eq(); S.eq.codigos ||= {}; S.sha.eq = eq.sha; // equivalencias código del fabricante → reactivo (alta por foto)
     S.inv.items ||= [];
     for (const i of S.inv.items) { i.historial ||= []; if (i.reactivo) i.reactivo.pictogramas ||= []; if (i.coleccion) i.coleccion.ejemplares ||= []; }
     for (const r of S.cat) r.pictogramas ||= [];
