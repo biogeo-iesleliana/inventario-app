@@ -1,4 +1,4 @@
-// Inventario del Departamento de Biología y Geología — versión 1.1
+// Inventario del Departamento de Biología y Geología — versión 1.2
 // App estática (GitHub Pages). Los datos viven en un repositorio privado y se leen/escriben
 // con la API de contenidos de GitHub usando un token cifrado con la contraseña del departamento.
 // Este archivo: arranque, acceso, enrutado, inventario, fichas y avisos.
@@ -7,6 +7,7 @@ import { VERSION, $, $$, esc, norm, uniq, today, nowISO, newId, TIPOS, ESTADOS, 
   dialog, info, confirmBox, items, opts, specsFor, armariosFor, dl, sel, ghsSvg, casValido, label, learn, normFecha, filtrar, ordenar, cant, estadoPill, filterBar, bindFilters,
   blank, ensureSub, fld, mismo, minimo, bajoMinimo, caducidad, avisos, nUrgentes, download } from "./core.js";
 import { vCatalogo, vImportar, vListados, vAjustes } from "./vistas.js";
+import { vFoto } from "./foto.js";
 
 /* ---------- arranque y acceso ---------- */
 let lastHash = location.hash, reverting = false;
@@ -91,7 +92,7 @@ function route() {
   $$(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === (view === "ficha" || view === "nuevo" ? "inventario" : view || "inventario")));
   const n = nUrgentes(); $("#badge").textContent = n || ""; $("#badge").hidden = !n;
   const c = $("#content");
-  ({ inventario: vInventario, ficha: () => vFicha(arg), nuevo: () => vFicha(null, arg), avisos: vAvisos, reactivos: vCatalogo, importar: vImportar, listados: () => vListados(c, arg), ajustes: vAjustes }[view] || vInventario)(c);
+  ({ inventario: vInventario, ficha: () => vFicha(arg), nuevo: () => vFicha(null, arg), avisos: vAvisos, reactivos: vCatalogo, foto: vFoto, importar: vImportar, listados: () => vListados(c, arg), ajustes: vAjustes }[view] || vInventario)(c);
   window.scrollTo(0, 0);
 }
 

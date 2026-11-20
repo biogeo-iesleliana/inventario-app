@@ -1,6 +1,6 @@
-// Inventario del Departamento — vistas de catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes (v1.1)
+// Inventario del Departamento — vistas de catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes (v1.2)
 
-import { VERSION, $, $$, esc, norm, uniq, today, nowISO, TIPOS, ESTADOS, S, store, commit, sync, guard, who, items, opts, dl, sel, ghsSvg, label, learn, normFecha, cursoActual,
+import { VERSION, $, $$, esc, norm, uniq, today, nowISO, finMes, TIPOS, ESTADOS, S, store, commit, sync, guard, who, items, opts, dl, sel, ghsSvg, label, learn, normFecha, cursoActual,
   filtrar, ordenar, cant, filterBar, bindFilters, blank, ensureSub, fld, mismo, minimo, bajoMinimo, download, parseCSV, fillWho } from "./core.js";
 import { xlsxBlob } from "./xlsx-mini.js";
 
@@ -49,9 +49,10 @@ export function vCatalogo(c) {
 }
 
 /* ---------- vista: importar ---------- */
-const CAMPOS = [["ref", "N.º referencia"], ["denominacion", "Denominación *"], ["especificacion", "Especificación"], ["marca", "Marca / modelo"], ["cantidad", "Cantidad"], ["cantidadIndeterminada", "Cantidad indeterminada (Sí)"], ["ubicacion", "Ubicación"], ["armario", "Armario"], ["tipo", "Tipo de registro"], ["categoria", "Categoría"], ["estado", "Estado"], ["origen", "Origen (Compra / Dotación)"], ["fechaAlta", "Fecha de alta"], ["fechaBaja", "Fecha de baja"], ["motivoBaja", "Motivo de baja"], ["codigoProveedor", "Código de artículo del proveedor"], ["precio", "Precio unitario"], ["observaciones", "Observaciones"], ["r.cas", "CAS (reactivos)"], ["r.formula", "Fórmula (reactivos)"]];
+const CAMPOS = [["ref", "N.º referencia"], ["denominacion", "Denominación *"], ["especificacion", "Especificación"], ["marca", "Marca / modelo"], ["cantidad", "Cantidad"], ["cantidadIndeterminada", "Cantidad indeterminada (Sí)"], ["ubicacion", "Ubicación"], ["armario", "Armario"], ["tipo", "Tipo de registro"], ["categoria", "Categoría"], ["estado", "Estado"], ["origen", "Origen (Compra / Dotación)"], ["fechaAlta", "Fecha de alta"], ["fechaBaja", "Fecha de baja"], ["motivoBaja", "Motivo de baja"], ["codigoProveedor", "Código de artículo del proveedor"], ["precio", "Precio unitario"], ["observaciones", "Observaciones"], ["r.cas", "CAS (reactivos)"], ["r.formula", "Fórmula (reactivos)"], ["r.fabricante", "Fabricante (reactivos)"], ["r.refFabricante", "Código del fabricante (reactivos)"], ["r.lote", "Lote (reactivos)"], ["r.envase", "Envase (reactivos)"], ["r.fechaCaducidad", "Caducidad (reactivos)"], ["r.armarioSeguridad", "Armario de seguridad (reactivos)"], ["r.pictogramas", "Pictogramas SGA (reactivos)"]];
 // Nombres de columna habituales para proponer la correspondencia (primero coincidencia exacta; después, por comienzo)
-const SIN = { ref: ["n.º referencia", "nº referencia", "n. referencia", "referencia", "n.º ref.", "ref.", "ref"], denominacion: ["denominacion", "descripcion", "articulo", "concepto", "material", "producto", "nombre"], especificacion: ["especificacion"], marca: ["marca"], cantidad: ["cantidad", "unidades", "uds", "ud.", "cant"], cantidadIndeterminada: ["cantidad indeterminada"], ubicacion: ["ubicacion"], armario: ["armario"], tipo: ["tipo de registro", "tipo"], categoria: ["categoria"], estado: ["estado"], origen: ["origen", "dotacion / compra", "dotacion/compra", "dotacion"], fechaAlta: ["fecha de alta", "fecha alta", "f. alta"], fechaBaja: ["fecha de baja", "fecha baja", "f. baja"], motivoBaja: ["motivo de baja", "motivo"], codigoProveedor: ["codigo", "cod."], precio: ["precio unitario", "precio", "p. unit", "pvp"], observaciones: ["observaciones"], "r.cas": ["cas", "n.º cas"], "r.formula": ["formula"] };
+const SIN = { ref: ["n.º referencia", "nº referencia", "n. referencia", "referencia", "n.º ref.", "ref.", "ref"], denominacion: ["denominacion", "descripcion", "articulo", "concepto", "material", "producto", "nombre"], especificacion: ["especificacion"], marca: ["marca"], cantidad: ["cantidad", "unidades", "uds", "ud.", "cant"], cantidadIndeterminada: ["cantidad indeterminada"], ubicacion: ["ubicacion"], armario: ["armario"], tipo: ["tipo de registro", "tipo"], categoria: ["categoria"], estado: ["estado"], origen: ["origen", "dotacion / compra", "dotacion/compra", "dotacion"], fechaAlta: ["fecha de alta", "fecha alta", "f. alta"], fechaBaja: ["fecha de baja", "fecha baja", "f. baja"], motivoBaja: ["motivo de baja", "motivo"], codigoProveedor: ["codigo", "cod."], precio: ["precio unitario", "precio", "p. unit", "pvp"], observaciones: ["observaciones"], "r.cas": ["cas", "n.º cas"], "r.formula": ["formula"],
+  "r.fabricante": ["fabricante"], "r.refFabricante": ["referencia del fabricante", "codigo del fabricante", "ref. fabricante"], "r.lote": ["lote", "n.º de lote", "lot"], "r.envase": ["envase", "envase y contenido", "contenido"], "r.fechaCaducidad": ["caducidad", "fecha de caducidad"], "r.armarioSeguridad": ["armario de seguridad"], "r.pictogramas": ["pictogramas", "pictogramas sga"] };
 const CAB = ["denominacion", "descripcion", "articulo", "concepto", "cantidad", "unidades", "ubicacion", "referencia", "n.º ref", "codigo", "precio", "importe"];
 const numero = s => { const t = String(s).replace(/[\s€]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."); return t !== "" && isFinite(+t) ? +t : null; };
 const frase = s => /[A-ZÁÉÍÓÚÑ]/.test(s) && s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLowerCase() : s;
@@ -145,7 +146,12 @@ export function vImportar(c) {
           cantidad: indet ? null : (n != null && n >= 0 ? n : (cn === "" && map.cantidad >= 0 ? null : 1)), cantidadIndeterminada: indet, ubicacion: get(r, "ubicacion") || def.ubic, armario: get(r, "armario"),
           estado: est || (fb ? "De baja" : "Operativo"), origen: og.startsWith("compra") ? "Compra" : og.startsWith("dotac") ? "Dotación" : def.origen, fechaAlta: fa || def.alta || "", fechaBaja: fb || "", motivoBaja: get(r, "motivoBaja"),
           proveedor: def.prov, factura: def.fact, codigoProveedor: get(r, "codigoProveedor"), precio: numero(get(r, "precio")), observaciones: obs });
-        if (i.reactivo) Object.assign(i.reactivo, { cas: get(r, "r.cas"), formula: get(r, "r.formula") });
+        if (i.reactivo) {
+          const cad = normFecha(get(r, "r.fechaCaducidad"));
+          Object.assign(i.reactivo, { cas: get(r, "r.cas"), formula: get(r, "r.formula"), fabricante: get(r, "r.fabricante"), refFabricante: get(r, "r.refFabricante"), lote: get(r, "r.lote"), envase: get(r, "r.envase"),
+            fechaCaducidad: finMes(cad || ""), armarioSeguridad: get(r, "r.armarioSeguridad"), pictogramas: uniq(get(r, "r.pictogramas").toUpperCase().match(/GHS0\d/g) || []) });
+          if (cad === null) i.observaciones = [i.observaciones, `Caducidad original: ${get(r, "r.fechaCaducidad")}`].filter(Boolean).join(" · ");
+        }
         nuevos.push(i);
       }
       if (minus) nuevos.forEach(i => { i.denominacion = frase(i.denominacion); });
@@ -279,5 +285,5 @@ export function vAjustes(c) {
     await guard(() => commit("listas", l => { l.centro = centro; Object.assign(l, vals); }, `Ajustes actualizados (por ${w})`), "Ajustes guardados.");
     fillWho();
   };
-  $("#a-backup").onclick = () => download(`copia-inventario-${today()}.json`, JSON.stringify({ exportado: nowISO(), version: VERSION, inventario: S.inv, listas: S.listas }, null, 1), "application/json");
+  $("#a-backup").onclick = () => download(`copia-inventario-${today()}.json`, JSON.stringify({ exportado: nowISO(), version: VERSION, inventario: S.inv, listas: S.listas, equivalencias: S.eq }, null, 1), "application/json");
 }

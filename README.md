@@ -16,7 +16,11 @@ Aplicación web del inventario de material, equipos, reactivos y colecciones del
 | `js/vistas.js` | Catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes |
 | `js/xlsx-mini.js` | Generador de archivos Excel propio (sin librerías externas) |
 | `js/pdf-import.js` | Lectura local de PDF y reconstrucción de las columnas |
+| `js/foto.js` | Alta de reactivos por foto de la etiqueta |
+| `js/etiqueta.js` | Interpretación del texto de la etiqueta: código del fabricante, CAS, lote, caducidad, envase y nombre |
 | `vendor/` | PDF.js (Mozilla, licencia Apache 2.0). Solo se carga al importar un PDF |
+| `vendor/tesseract/` | Lector de etiquetas (Tesseract.js y datos de español e inglés, Apache 2.0). Solo se carga en «Alta por foto». Ver `vendor/tesseract/LEEME.md` |
+| `.github/workflows/instalar-ocr.yml` | Instala o actualiza el lector de etiquetas (Actions → Run workflow) |
 | `config.json` | Organización, repositorio de datos, token cifrado y fecha de caducidad. Se genera desde «Configurar el acceso» |
 | `.nojekyll` | Indica a GitHub Pages que publique los archivos tal cual |
 
