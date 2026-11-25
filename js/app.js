@@ -1,13 +1,14 @@
-// Inventario del Departamento de Biología y Geología — versión 1.2
+// Inventario del Departamento de Biología y Geología — versión 1.3
 // App estática (GitHub Pages). Los datos viven en un repositorio privado y se leen/escriben
 // con la API de contenidos de GitHub usando un token cifrado con la contraseña del departamento.
 // Este archivo: arranque, acceso, enrutado, inventario, fichas y avisos.
 
 import { VERSION, $, $$, esc, norm, uniq, today, nowISO, newId, TIPOS, ESTADOS, GHS, NOMBRES, S, encryptToken, decryptToken, store, api, ghError, commit, sync, guard, loadAll, fillWho, onWho, who,
   dialog, info, confirmBox, items, opts, specsFor, armariosFor, dl, sel, ghsSvg, casValido, label, learn, normFecha, filtrar, ordenar, cant, estadoPill, filterBar, bindFilters,
-  blank, ensureSub, fld, mismo, minimo, bajoMinimo, caducidad, avisos, nUrgentes, download } from "./core.js";
+  blank, ensureSub, fld, mismo, minimo, bajoMinimo, caducidad, avisos, nUrgentes, download, LIBRO, IDIOMAS, TIPOS_PUB, NIVELES, ESTADOS_EJ, isbnValido, isbnNorm, esIsbn } from "./core.js";
 import { vCatalogo, vImportar, vListados, vAjustes } from "./vistas.js";
 import { vFoto } from "./foto.js";
+import { vLibros, buscarISBN, autoresLista } from "./libros.js";
 
 /* ---------- arranque y acceso ---------- */
 let lastHash = location.hash, reverting = false;
@@ -92,7 +93,7 @@ function route() {
   $$(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === (view === "ficha" || view === "nuevo" ? "inventario" : view || "inventario")));
   const n = nUrgentes(); $("#badge").textContent = n || ""; $("#badge").hidden = !n;
   const c = $("#content");
-  ({ inventario: vInventario, ficha: () => vFicha(arg), nuevo: () => vFicha(null, arg), avisos: vAvisos, reactivos: vCatalogo, foto: vFoto, importar: vImportar, listados: () => vListados(c, arg), ajustes: vAjustes }[view] || vInventario)(c);
+  ({ inventario: vInventario, ficha: () => vFicha(arg), nuevo: () => vFicha(null, arg), avisos: vAvisos, reactivos: vCatalogo, foto: vFoto, libros: vLibros, importar: vImportar, listados: () => vListados(c, arg), ajustes: vAjustes }[view] || vInventario)(c);
   window.scrollTo(0, 0);
 }
 
@@ -116,7 +117,7 @@ function vInventario(c) {
     $("#inv-body").innerHTML = shown.map(i => `<tr data-id="${esc(i.id)}">
       <td class="ck"><input type="checkbox" data-ck="${esc(i.id)}" ${S.marcados.has(i.id) ? "checked" : ""} aria-label="Seleccionar ${esc(i.denominacion)}"></td>
       <td data-l="Ref." class="mono">${esc(i.ref)}</td>
-      <td data-l="Denominación"><a href="#ficha/${esc(i.id)}"><strong>${esc(i.denominacion)}</strong></a>${i.especificacion || i.marca ? `<div class="sub">${esc([i.especificacion, i.marca].filter(Boolean).join(" · "))}</div>` : ""}${i.reactivo?.pictogramas?.length ? `<div>${i.reactivo.pictogramas.map(ghsSvg).join("")}</div>` : ""}</td>
+      <td data-l="Denominación"><a href="#ficha/${esc(i.id)}"><strong>${esc(i.denominacion)}</strong></a>${i.especificacion || i.marca ? `<div class="sub">${esc([i.especificacion, i.marca].filter(Boolean).join(" · "))}</div>` : ""}${i.libro ? `<div class="sub">${esc([autoresLista(i.libro.autores).join("; "), i.libro.editorial, i.libro.anio].filter(Boolean).join(" · "))}</div>` : ""}${i.reactivo?.pictogramas?.length ? `<div>${i.reactivo.pictogramas.map(ghsSvg).join("")}</div>` : ""}</td>
       <td data-l="Cantidad" class="num">${esc(cant(i))}${bajoMinimo(i) ? ` <span class="pill baja" title="Por debajo del stock mínimo (${minimo(i)})">reponer</span>` : ""}</td>
       <td data-l="Ubicación">${esc(i.ubicacion)}${i.armario ? `<div class="sub">${esc(i.armario)}</div>` : ""}</td>
       <td data-l="Categoría">${esc(i.categoria)}<div class="sub">${esc(i.tipo)}</div></td>
@@ -188,7 +189,9 @@ function vFicha(id, tipoNuevo, preset) {
   const orig = preset ? preset.orig : id ? items().find(i => i.id === id) : null;
   if (id && !orig && !preset) { c.innerHTML = `<p>No se encuentra este elemento.</p><a href="#inventario">Volver al inventario</a>`; return; }
   const it = ensureSub(preset ? preset.obj : structuredClone(orig || blank(decodeURIComponent(tipoNuevo || ""))));
-  const r = it.tipo === "Reactivos" ? it.reactivo : null, fu = it.tipo === "Material fungible" ? it.fungible : null, co = it.tipo === "Colecciones" ? it.coleccion : null;
+  const r = it.tipo === "Reactivos" ? it.reactivo : null, fu = it.tipo === "Material fungible" ? it.fungible : null;
+  const co = it.tipo === "Colecciones" ? it.coleccion : null, lb = it.tipo === LIBRO ? it.libro : null;
+  const origenes = ["Compra", "Dotación", ...(lb || it.origen === "Donación" ? ["Donación"] : [])];
   const cad = orig ? caducidad(orig) : "";
   c.innerHTML = `<p><a href="#inventario">← Inventario</a></p>
   <form class="sheet" id="f-item" autocomplete="off">
@@ -197,15 +200,15 @@ function vFicha(id, tipoNuevo, preset) {
       <div><label for="i-tipo">Tipo de registro</label>${sel("i-tipo", TIPOS, it.tipo, null)}</div>
       ${fld("i-cat", "Categoría", it.categoria, 'list="dl-cat"')}
       ${fld("i-ref", "N.º de referencia (Secretaría)", it.ref, 'class="mono"')}
-      ${fld("i-den", "Denominación *", it.denominacion, 'list="dl-den" required', "span2")}
+      ${fld("i-den", lb ? "Título *" : "Denominación *", it.denominacion, 'list="dl-den" required', "span2")}
       ${fld("i-spec", "Especificación / capacidad", it.especificacion, 'list="dl-spec"')}
       ${fld("i-marca", "Marca / modelo", it.marca, 'list="dl-marca"')}
-      <div><label for="i-cant">Cantidad</label><input id="i-cant" type="number" min="0" step="1" value="${esc(it.cantidad ?? "")}" ${it.cantidadIndeterminada ? "disabled" : ""}></div>
+      <div><label for="i-cant">Cantidad</label><input id="i-cant" type="number" min="0" step="1" value="${esc(lb?.ejemplares.length || (it.cantidad ?? ""))}" ${it.cantidadIndeterminada || lb?.ejemplares.length ? "disabled" : ""}>${lb ? `<div class="sub">N.º de ejemplares. Se calcula solo si los registras uno a uno.</div>` : ""}</div>
       <div><label class="check" style="margin-top:32px"><input id="i-indet" type="checkbox" ${it.cantidadIndeterminada ? "checked" : ""}> Cantidad indeterminada (varios)</label></div>
       ${fld("i-ubic", "Ubicación *", it.ubicacion, 'list="dl-ubic" required')}
       ${fld("i-arm", "Armario / estante", it.armario, 'list="dl-arm"')}
       <div><label for="i-estado">Estado</label>${sel("i-estado", ESTADOS.filter(e => e !== "De baja" || it.estado === "De baja"), it.estado, null)}</div>
-      <div><label>Origen</label><div class="row" style="padding-top:6px">${["Compra", "Dotación"].map(o => `<label class="check" style="margin:0"><input type="radio" name="i-origen" value="${o}" ${it.origen === o ? "checked" : ""}> ${o}</label>`).join("")}</div></div>
+      <div><label>Origen</label><div class="row" style="padding-top:6px">${origenes.map(o => `<label class="check" style="margin:0"><input type="radio" name="i-origen" value="${o}" ${it.origen === o ? "checked" : ""}> ${o}</label>`).join("")}</div></div>
       ${fld("i-alta", "Fecha de alta", it.fechaAlta, 'placeholder="aaaa-mm-dd (o solo aaaa-mm / aaaa)"')}
       ${fld("i-prov", "Proveedor", it.proveedor, 'list="dl-prov"')}
       ${fld("i-codprov", "Código de artículo del proveedor", it.codigoProveedor)}
@@ -243,6 +246,22 @@ function vFicha(id, tipoNuevo, preset) {
       <h3 style="margin-top:12px">Ejemplares (opcional)</h3>
       <div class="tablewrap"><table class="ej-table"><thead><tr><th>N.º muestra</th><th>Nombre</th><th>Clasificación</th><th>Localidad</th><th>Edad / época</th><th>Estado</th><th></th></tr></thead><tbody id="ej-body"></tbody></table></div>
       <button class="btn ghost small" type="button" id="ej-add" style="margin-top:8px">+ Añadir ejemplar</button></fieldset>` : ""}
+    ${lb ? `<fieldset><legend>Libro / publicación</legend><div class="grid">
+      <div><label for="b-isbn">ISBN / ISSN</label><div class="row" style="flex-wrap:nowrap"><input id="b-isbn" class="mono" value="${esc(lb.isbn)}" placeholder="978-84-…"><button class="btn ghost small" type="button" id="b-buscar">Buscar datos</button></div><div class="sub" id="b-isbn-msg" role="status"></div></div>
+      ${fld("b-sub", "Subtítulo", lb.subtitulo, "", "span2")}
+      ${fld("b-aut", "Autores («Apellidos, Nombre», separados por punto y coma)", lb.autores, 'placeholder="Curtis, Helena; Barnes, N. Sue"', "span2")}
+      ${fld("b-edit", "Editorial", lb.editorial, 'list="dl-edit"')}
+      ${fld("b-anio", "Año", lb.anio, 'inputmode="numeric" maxlength="4"')}
+      ${fld("b-ed", "Edición", lb.edicion, 'placeholder="2 (vacío si es la primera)"')}
+      ${fld("b-idioma", "Idioma", lb.idioma, 'list="dl-idioma"')}
+      ${fld("b-tipo", "Tipo de publicación", lb.tipoPublicacion, 'list="dl-tpub"')}
+      ${fld("b-mat", "Materia", lb.materia, 'list="dl-mat"')}
+      ${fld("b-port", "Portada (enlace a la imagen)", lb.portada, 'type="url"', "span2")}</div>
+      <label>Nivel orientativo</label><div class="row">${NIVELES.map(n => `<label class="check" style="margin:0"><input type="checkbox" name="b-niv" value="${n}" ${lb.niveles.includes(n) ? "checked" : ""}> ${n}</label>`).join("")}</div>
+      <div id="b-cover"></div>
+      <h3 style="margin-top:12px">Ejemplares (opcional)</h3><p class="muted small" style="margin:0 0 6px">Regístralos uno a uno si quieres numerarlos o anotar el estado de cada uno.</p>
+      <div class="tablewrap"><table class="ej-table"><thead><tr><th>Código</th><th>Estante</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody id="bj-body"></tbody></table></div>
+      <button class="btn ghost small" type="button" id="bj-add" style="margin-top:8px">+ Añadir ejemplar</button></fieldset>` : ""}
     ${orig?.historial?.length ? `<fieldset><legend>Historial</legend><ul class="hist">${orig.historial.slice().reverse().map(h => `<li>${esc(String(h.fecha || "").replace("T", " "))} · <strong>${esc(h.por)}</strong> · ${esc(h.accion)}${h.detalle ? ` · ${esc(h.detalle)}` : ""}</li>`).join("")}</ul></fieldset>` : ""}
     <div class="actions">
       <button class="btn" type="submit">Guardar</button>
@@ -255,6 +274,7 @@ function vFicha(id, tipoNuevo, preset) {
     ${dl("dl-cat", opts("categorias", "categoria"))}${dl("dl-den", uniq(items().map(i => i.denominacion)))}${dl("dl-spec", specsFor(it.denominacion))}${dl("dl-marca", uniq(items().map(i => i.marca)))}
     ${dl("dl-ubic", opts("ubicaciones", "ubicacion"))}${dl("dl-arm", armariosFor(it.ubicacion))}${dl("dl-prov", opts("proveedores", "proveedor"))}${dl("dl-motivo", S.listas.motivosBaja || [])}
     ${dl("dl-fab", opts("fabricantes"))}${dl("dl-conc", opts("concentraciones"))}${dl("dl-armseg", opts("armariosSeguridad"))}${dl("dl-unid", opts("unidadesStock"))}${dl("dl-tcol", opts("tiposColeccion"))}
+    ${lb ? dl("dl-edit", opts("editoriales")) + dl("dl-idioma", uniq([...IDIOMAS, ...opts("idiomas")])) + dl("dl-tpub", uniq([...TIPOS_PUB, ...opts("tiposPublicacion")])) + dl("dl-mat", opts("materias")) : ""}
   </form>`;
 
   const form = $("#f-item");
@@ -265,7 +285,7 @@ function vFicha(id, tipoNuevo, preset) {
   $("#i-ubic").addEventListener("change", e => { $("#dl-arm").outerHTML = dl("dl-arm", armariosFor(e.target.value)); });
   $("#i-indet").addEventListener("change", e => { $("#i-cant").disabled = e.target.checked; });
   // al cambiar de tipo se conservan los datos específicos ya escritos, por si se vuelve atrás
-  $("#i-tipo").addEventListener("change", () => { collect(it); ensureSub(it); if (it.tipo === "Reactivos" && !it.categoria) it.categoria = "Reactivos"; vFicha(null, null, { obj: it, orig }); S.dirty = true; });
+  $("#i-tipo").addEventListener("change", () => { collect(it); ensureSub(it); if (it.tipo === "Reactivos" && !it.categoria) it.categoria = "Reactivos"; if (it.tipo === LIBRO && !it.categoria) it.categoria = "Biblioteca"; vFicha(null, null, { obj: it, orig }); S.dirty = true; });
   if (r) {
     const casMsg = () => { const v = $("#r-cas").value.trim(); $("#r-cas-msg").textContent = !v ? "" : casValido(v) ? "✓ CAS válido" : "El dígito de control no cuadra: revisa el número."; $("#r-links").innerHTML = v && casValido(v) ? `Información de seguridad: <a href="https://pubchem.ncbi.nlm.nih.gov/compound/${encodeURIComponent(v)}" target="_blank" rel="noopener noreferrer">PubChem</a>` : ""; };
     $("#r-cas").addEventListener("input", casMsg); casMsg();
@@ -281,6 +301,38 @@ function vFicha(id, tipoNuevo, preset) {
     $("#ej-add").addEventListener("click", () => { co.ejemplares.push({ n: String(co.ejemplares.length + 1), nombre: "", clasificacion: "", localidad: "", edad: "", estado: "Completo", observaciones: "" }); touch(); drawEj(); });
     drawEj();
   }
+  if (lb) {
+    const isbnMsg = () => { const v = $("#b-isbn").value.trim(); $("#b-isbn-msg").textContent = !v ? "" : isbnValido(v) ? (esIsbn(v) ? "✓ ISBN válido" : "✓ ISSN válido") : "El dígito de control no cuadra: revisa el número."; };
+    const cover = () => { const u = $("#b-port").value.trim(); $("#b-cover").innerHTML = /^https:\/\//.test(u) ? `<img class="lb-cover" src="${esc(u)}" alt="Portada">` : ""; };
+    $("#b-isbn").addEventListener("input", isbnMsg); $("#b-port").addEventListener("change", cover); isbnMsg(); cover();
+    $("#b-buscar").addEventListener("click", async () => {
+      const v = $("#b-isbn").value.trim(), m = $("#b-isbn-msg");
+      if (!esIsbn(v)) { m.textContent = isbnValido(v) ? "Las revistas (ISSN) no se buscan: escribe los datos." : "Escribe primero un ISBN válido."; return; }
+      m.textContent = "Buscando en Open Library y Google Books (solo se envía el ISBN)…";
+      const { datos, fuentes, fallos } = await buscarISBN(v);
+      if (!$("#b-isbn")) return; // se ha salido de la ficha
+      if (!datos) { m.textContent = fallos.length ? `No se ha podido consultar ${fallos.join(" ni ")}. Comprueba la conexión.` : "Ningún servicio conoce este ISBN: rellena los datos a mano."; return; }
+      const campos = [["i-den", "titulo"], ["b-sub", "subtitulo"], ["b-aut", "autores"], ["b-edit", "editorial"], ["b-anio", "anio"], ["b-idioma", "idioma"], ["b-port", "portada"]];
+      let n = 0; for (const [id, k] of campos) if (datos[k] && !$("#" + id).value.trim()) { $("#" + id).value = datos[k]; n++; }
+      if (n) { touch(); cover(); }
+      m.textContent = n ? `Datos de ${fuentes.join(" + ")}: se han rellenado ${n} campos vacíos (los que ya tenían algo no se tocan). Revísalos y guarda.` : `${fuentes.join(" + ")} no aporta nada nuevo: los campos ya estaban rellenos.`;
+    });
+    const body = $("#bj-body");
+    const drawBj = () => {
+      body.innerHTML = lb.ejemplares.map((e, k) => `<tr data-k="${k}"><td><input data-f="codigo" value="${esc(e.codigo)}" aria-label="Código"></td><td><input data-f="estante" value="${esc(e.estante)}" aria-label="Estante"></td>
+        <td><select data-f="estado" aria-label="Estado">${[...new Set([...ESTADOS_EJ, e.estado].filter(Boolean))].map(x => `<option${x === e.estado ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></td>
+        <td><input data-f="observaciones" value="${esc(e.observaciones)}" aria-label="Observaciones"></td><td><button type="button" class="btn ghost small" data-del="${k}" aria-label="Quitar ejemplar">✕</button></td></tr>`).join("") || `<tr><td colspan="5" class="muted">Sin ejemplares registrados uno a uno.</td></tr>`;
+      $("#i-cant").disabled = lb.ejemplares.length > 0 || $("#i-indet").checked; if (lb.ejemplares.length) $("#i-cant").value = lb.ejemplares.length;
+    };
+    const upd = e => { const tr = e.target.closest("tr[data-k]"); if (tr && e.target.dataset.f) lb.ejemplares[+tr.dataset.k][e.target.dataset.f] = e.target.value; };
+    body.addEventListener("input", upd); body.addEventListener("change", upd);
+    body.addEventListener("click", e => { const k = e.target.dataset.del; if (k !== undefined) { lb.ejemplares.splice(+k, 1); touch(); drawBj(); } });
+    $("#bj-add").addEventListener("click", () => {
+      if (!lb.ejemplares.length) { const n = Math.max(0, Math.round(+$("#i-cant").value || 0)); for (let k = 1; k < n; k++) lb.ejemplares.push({ codigo: "", estante: "", estado: "Bueno", observaciones: "" }); } // conserva la cantidad que ya había
+      lb.ejemplares.push({ codigo: "", estante: "", estado: "Bueno", observaciones: "" }); touch(); drawBj();
+    });
+    drawBj();
+  }
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
@@ -288,6 +340,13 @@ function vFicha(id, tipoNuevo, preset) {
     if (rec.tipo !== "Reactivos") delete rec.reactivo;
     if (rec.tipo !== "Material fungible") delete rec.fungible;
     if (rec.tipo !== "Colecciones") delete rec.coleccion;
+    if (rec.tipo !== LIBRO) delete rec.libro;
+    if (rec.libro) {
+      const raw = rec.libro.isbn;
+      if (raw && !isbnValido(raw) && !await confirmBox("ISBN / ISSN no válido", `«${raw}» no cuadra con el dígito de control. Puede ser un error al copiarlo. ¿Guardar igualmente?`, "Guardar igualmente")) return;
+      rec.libro.isbn = isbnNorm(raw);
+      if (rec.libro.ejemplares.length) { rec.cantidad = rec.libro.ejemplares.length; rec.cantidadIndeterminada = false; }
+    }
     for (const k of ["fechaAlta", "fechaBaja"]) {
       const n = normFecha(rec[k]);
       if (n === null) { await info("Fecha no válida", `La ${NOMBRES[k]} «${rec[k]}» no se entiende. Escríbela como aaaa-mm-dd (también vale aaaa-mm, aaaa o dd/mm/aaaa).`); return; }
@@ -295,8 +354,17 @@ function vFicha(id, tipoNuevo, preset) {
     }
     const w = await who(); if (!w) return;
     if (rec.ref && items().some(x => x.ref === rec.ref && x.id !== rec.id)) { if (!await confirmBox("Referencia repetida", `Ya hay otro elemento con el n.º de referencia ${rec.ref}. ¿Guardar igualmente?`, "Guardar")) return; }
-    if (!orig && !rec.ref && !rec.cantidadIndeterminada && rec.cantidad != null) { // alta de algo que ya existe en el mismo sitio: proponer sumar
-      const ex = items().find(x => x.estado !== "De baja" && !x.cantidadIndeterminada && !x.ref && mismo(x, rec));
+    if (!orig && rec.libro?.isbn) { // el mismo libro ya registrado
+      const ex = items().find(x => x.id !== rec.id && x.estado !== "De baja" && x.libro?.isbn === rec.libro.isbn);
+      if (ex) {
+        const ans = await dialog(`<h2>Este libro ya está en el inventario</h2><p><strong>${esc(label(ex))}</strong> · ${esc([ex.ubicacion, ex.armario].filter(Boolean).join(" · "))} · ${esc(cant(ex) || 0)} ejempl.</p><p>Para añadir ejemplares, abre esa ficha y cambia la cantidad (o registra los ejemplares). Crea otra línea solo si están en otra ubicación.</p>
+          <div class="row"><button class="btn" value="open">Abrir esa ficha</button><button class="btn ghost" value="new">Crear otra línea</button><button class="btn ghost" value="no">Cancelar</button></div>`);
+        if (ans === "open") return go("#ficha/" + ex.id);
+        if (ans !== "new") return;
+      }
+    }
+    if (!orig && !rec.ref && !rec.cantidadIndeterminada && rec.cantidad != null && !rec.libro?.ejemplares.length) { // alta de algo que ya existe en el mismo sitio: proponer sumar
+      const ex = items().find(x => x.estado !== "De baja" && !x.cantidadIndeterminada && !x.ref && !x.libro?.ejemplares?.length && mismo(x, rec) && (!rec.libro?.isbn || x.libro?.isbn === rec.libro.isbn));
       if (ex) {
         const ans = await dialog(`<h2>Ya hay una línea igual</h2><p><strong>${esc(label(ex))}</strong> · ${esc(ex.ubicacion)}${ex.armario ? " · " + esc(ex.armario) : ""} · ${esc(cant(ex) || 0)} ud.</p><p>¿Sumar las ${rec.cantidad} unidades a esa línea o crear una línea aparte?</p>
           <div class="row"><button class="btn" value="sum">Sumar a la existente</button><button class="btn ghost" value="new">Crear línea aparte</button><button class="btn ghost" value="no">Cancelar</button></div>`);
@@ -379,7 +447,7 @@ function vFicha(id, tipoNuevo, preset) {
     await guard(() => commit("inv", d => { const cur = d.items.find(x => x.id === orig.id); if (!cur) throw new Error("Este elemento ya no existe. Pulsa «Actualizar»."); Object.assign(cur, { estado: "Operativo", fechaBaja: "", motivoBaja: "" }); (cur.historial ||= []).push({ fecha: nowISO(), por: w, accion: "Reactivación" }); }, `Reactivación: ${label(orig)} (por ${w})`), "Elemento reactivado.");
     route();
   });
-  $("#b-dup")?.addEventListener("click", () => { const d = structuredClone(orig); d.id = newId(); d.ref = ""; d.historial = []; d.fechaAlta = today(); if (d.coleccion) d.coleccion.ejemplares = []; vFicha(null, null, { obj: d, orig: null }); S.dirty = true; window.scrollTo(0, 0); });
+  $("#b-dup")?.addEventListener("click", () => { const d = structuredClone(orig); d.id = newId(); d.ref = ""; d.historial = []; d.fechaAlta = today(); if (d.coleccion) d.coleccion.ejemplares = []; if (d.libro) d.libro.ejemplares = []; vFicha(null, null, { obj: d, orig: null }); S.dirty = true; window.scrollTo(0, 0); });
   $("#b-del")?.addEventListener("click", async () => {
     const w = await who(); if (!w) return;
     if (!await confirmBox("Eliminar definitivamente", "Úsalo solo si el elemento se registró por error. Si el material existía y ya no está, usa «Dar de baja» para que quede constancia. (El historial de GitHub conserva una copia.)", "Eliminar", true)) return;
@@ -400,6 +468,7 @@ function collect(it) {
   if ($("#i-fbaja")) { it.fechaBaja = v("i-fbaja"); it.motivoBaja = v("i-mbaja"); }
   if (it.reactivo && $("#r-cas")) Object.assign(it.reactivo, { formula: v("r-formula"), cas: v("r-cas"), fabricante: v("r-fab"), refFabricante: v("r-reffab"), lote: v("r-lote"), concentracion: v("r-conc"), estadoFisico: v("r-fis"), envase: v("r-env"), cantidadRestante: v("r-rest"), stockMinimo: num("r-min"), armarioSeguridad: v("r-armseg"), fechaApertura: v("r-fap"), fechaCaducidad: v("r-fcad"), fds: v("r-fds"), frasesHP: v("r-hp"), pictogramas: $$("input[name=r-ghs]:checked").map(x => x.value) });
   if (it.fungible && $("#u-unidad")) Object.assign(it.fungible, { unidadStock: v("u-unidad"), unidadesEnvase: num("u-porenv"), stockMinimo: num("u-min"), caducidad: v("u-cad") });
+  if (it.libro && $("#b-isbn")) Object.assign(it.libro, { isbn: v("b-isbn"), subtitulo: v("b-sub"), autores: v("b-aut").split(";").map(a => a.trim()).filter(Boolean).join("; "), editorial: v("b-edit"), anio: v("b-anio"), edicion: v("b-ed"), idioma: v("b-idioma"), tipoPublicacion: v("b-tipo"), materia: v("b-mat"), portada: v("b-port"), niveles: $$("input[name=b-niv]:checked").map(x => x.value) });
   if (it.coleccion && $("#c-tipo")) { it.coleccion.tipoColeccion = v("c-tipo"); it.coleccion.nEjemplares = it.coleccion.ejemplares.length || num("c-n"); }
   return it;
 }
@@ -407,7 +476,7 @@ function diff(a, b) {
   const ch = Object.keys(NOMBRES).filter(k => String(a[k] ?? "") !== String(b[k] ?? "")).map(k => `${NOMBRES[k]}: «${a[k] ?? ""}» → «${b[k] ?? ""}»`);
   if (!!a.cantidadIndeterminada !== !!b.cantidadIndeterminada) ch.push(`cantidad indeterminada: ${b.cantidadIndeterminada ? "sí" : "no"}`);
   // se comparan sin distinguir null, "" o campo ausente, para no registrar cambios que no lo son
-  const sub = o => JSON.stringify([o.reactivo, o.fungible, o.coleccion], (k, v) => v == null || v === "" || (Array.isArray(v) && !v.length) ? undefined : v);
+  const sub = o => JSON.stringify([o.reactivo, o.fungible, o.coleccion, o.libro], (k, v) => v == null || v === "" || (Array.isArray(v) && !v.length) ? undefined : v);
   if (sub(a) !== sub(b)) ch.push("datos específicos del tipo");
   return ch.join("; ");
 }

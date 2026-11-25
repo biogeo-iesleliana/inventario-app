@@ -24,7 +24,7 @@ export function equivalencias() {
 const delCatalogo = n => S.cat.find(r => r.nombre === n) || S.cat.find(r => norm(r.nombre) === norm(n)) || null;
 
 /* ---------- motor de lectura ---------- */
-async function comprobarMotor() {
+export async function comprobarMotor() {
   if (F.hayMotor !== null) return F.hayMotor;
   try { const r = await fetch(BASE + "tesseract.min.js", { method: "HEAD", cache: "no-store" }); F.hayMotor = r.ok; } catch { F.hayMotor = false; }
   return F.hayMotor;
@@ -32,7 +32,7 @@ async function comprobarMotor() {
 function script(src) {
   return new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => ko(new Error("No se ha podido cargar " + src)); document.head.appendChild(s); });
 }
-function motor() {
+export function motor() {
   F.motor ||= (async () => {
     if (!window.Tesseract) await script(BASE + "tesseract.min.js?v=" + VERSION);
     return window.Tesseract.createWorker(["spa", "eng"], 1, { // 1 = LSTM: el modelo de los datos incluidos
@@ -45,7 +45,7 @@ function motor() {
 
 /* ---------- imagen ---------- */
 // Reduce la foto, aplica el giro y prepara una versión en grises con más contraste para leerla mejor
-async function lienzo(file, rot) {
+export async function lienzo(file, rot) {
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
   const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height)), w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
   const c = document.createElement("canvas"), g = c.getContext("2d", { willReadFrequently: true }), q = rot % 2;
@@ -62,7 +62,7 @@ async function lienzo(file, rot) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.putImageData(img, 0, 0);
   return c;
 }
-async function barras(file) {
+export async function barras(file) {
   if (!("BarcodeDetector" in window)) return [];
   try {
     const formats = await window.BarcodeDetector.getSupportedFormats(); if (!formats.length) return [];

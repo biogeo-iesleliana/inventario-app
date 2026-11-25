@@ -1,7 +1,7 @@
-// Inventario del Departamento de Biología y Geología — núcleo compartido (v1.2)
+// Inventario del Departamento de Biología y Geología — núcleo compartido (v1.3)
 // Utilidades, estado, cifrado, API de GitHub, diálogos y reglas del inventario.
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0";
 export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 export const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -18,7 +18,13 @@ export const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); 
 export const newId = () => "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export const TIPOS = ["Equipo / mobiliario inventariable", "Material de laboratorio reutilizable", "Material fungible", "Reactivos", "Colecciones"];
+export const LIBRO = "Libros / publicaciones";
+export const TIPOS = ["Equipo / mobiliario inventariable", "Material de laboratorio reutilizable", "Material fungible", "Reactivos", "Colecciones", LIBRO];
+// Valores de partida de los desplegables de libros (se amplían con lo que se escriba)
+export const IDIOMAS = ["Castellano", "Valencià", "Inglés"];
+export const TIPOS_PUB = ["Consulta", "Guía de campo", "Didáctica", "Lectura / divulgación", "Revista", "Audiovisual"];
+export const NIVELES = ["ESO", "BAT", "FPB", "Docente"];
+export const ESTADOS_EJ = ["Bueno", "Deteriorado", "Extraviado"];
 export const ESTADOS = ["Operativo", "Deteriorado", "En reparación", "Pendiente de n.º de referencia", "De baja"];
 export const GHS = { GHS01: "Explosivo", GHS02: "Inflamable", GHS03: "Comburente", GHS04: "Gas a presión", GHS05: "Corrosivo", GHS06: "Toxicidad aguda", GHS07: "Nocivo / irritante", GHS08: "Peligro para la salud", GHS09: "Peligro para el medio ambiente" };
 export const FILES = { inv: "data/inventario.json", listas: "data/listas.json", cat: "data/catalogo-reactivos.json", eq: "data/equivalencias.json" };
@@ -132,7 +138,7 @@ export async function loadAll() {
     S.cat = Array.isArray(cat.data) ? cat.data : [];
     S.eq = eq.data || VACIO.eq(); S.eq.codigos ||= {}; S.sha.eq = eq.sha; // equivalencias código del fabricante → reactivo (alta por foto)
     S.inv.items ||= [];
-    for (const i of S.inv.items) { i.historial ||= []; if (i.reactivo) i.reactivo.pictogramas ||= []; if (i.coleccion) i.coleccion.ejemplares ||= []; }
+    for (const i of S.inv.items) { i.historial ||= []; if (i.reactivo) i.reactivo.pictogramas ||= []; if (i.coleccion) i.coleccion.ejemplares ||= []; if (i.libro) { i.libro.ejemplares ||= []; i.libro.niveles ||= []; } }
     for (const r of S.cat) r.pictogramas ||= [];
     S.listas.personas ||= []; S.listas.centro ||= { nombre: "", departamento: "", jefeDepartamento: "" };
     S.cargado = Date.now();
@@ -194,6 +200,26 @@ export function dl(id, values) { return `<datalist id="${id}">${values.map(v => 
 export const sel = (id, values, cur, empty = "") => { const vs = cur && !values.includes(cur) ? [...values, cur] : values; return `<select id="${id}">${empty !== null ? `<option value="">${esc(empty)}</option>` : ""}${vs.map(v => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>`; };
 export function ghsSvg(code) { return `<svg class="ghs" viewBox="0 0 40 40" role="img" aria-label="${esc(code)} ${esc(GHS[code] || "")}"><title>${esc(code)} · ${esc(GHS[code] || "")}</title><rect x="7" y="7" width="26" height="26" transform="rotate(45 20 20)" fill="var(--surface)" stroke="var(--ghs)" stroke-width="3"/><text x="20" y="25" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" font-weight="600" fill="var(--ink)">${esc(String(code).slice(3))}</text></svg>`; }
 export function casValido(cas) { const m = /^(\d{2,7})-(\d{2})-(\d)$/.exec(cas || ""); if (!m) return false; const d = (m[1] + m[2]).split("").reverse(); return d.reduce((s, x, i) => s + (+x) * (i + 1), 0) % 10 === +m[3]; }
+/* ---------- ISBN e ISSN ---------- */
+export const isbnLimpio = s => String(s ?? "").toUpperCase().replace(/[^0-9X]/g, "");
+const suma13 = d => [...d].reduce((a, c, k) => a + (+c) * (k % 2 ? 3 : 1), 0);
+// Acepta ISBN-13, ISBN-10 e ISSN (8 caracteres), con o sin guiones, y comprueba el dígito de control
+export function isbnValido(s) {
+  const d = isbnLimpio(s);
+  if (/^97[89]\d{10}$/.test(d)) return suma13(d) % 10 === 0;
+  if (/^\d{9}[\dX]$/.test(d)) return [...d].reduce((a, c, k) => a + (c === "X" ? 10 : +c) * (10 - k), 0) % 11 === 0;
+  if (/^\d{7}[\dX]$/.test(d)) { const r = (11 - [...d.slice(0, 7)].reduce((a, c, k) => a + (+c) * (8 - k), 0) % 11) % 11; return (r === 10 ? "X" : String(r)) === d[7]; }
+  return false;
+}
+// Forma en que se guarda: ISBN siempre en 13 cifras sin guiones; ISSN como 1234-567X. Si no es válido, se deja como se escribió.
+export function isbnNorm(s) {
+  const d = isbnLimpio(s);
+  if (!isbnValido(d)) return String(s ?? "").trim();
+  if (d.length === 8) return d.slice(0, 4) + "-" + d.slice(4);
+  if (d.length === 13) return d;
+  const b = "978" + d.slice(0, 9); return b + (10 - suma13(b) % 10) % 10;
+}
+export const esIsbn = s => { const d = isbnLimpio(s); return isbnValido(d) && d.length !== 8; };
 export const label = i => [i.denominacion, i.especificacion, i.marca].filter(Boolean).join(" · ");
 
 // Añade a las listas los valores nuevos escritos en fichas o importaciones (desplegables ampliables). Un solo guardado.
@@ -205,6 +231,7 @@ export async function learn(list) {
     if (item.reactivo) { push("fabricantes", item.reactivo.fabricante); push("concentraciones", item.reactivo.concentracion); push("armariosSeguridad", item.reactivo.armarioSeguridad); }
     if (item.fungible) push("unidadesStock", item.fungible.unidadStock);
     if (item.coleccion) push("tiposColeccion", item.coleccion.tipoColeccion);
+    if (item.libro) { push("editoriales", item.libro.editorial); push("materias", item.libro.materia); if (!IDIOMAS.includes(item.libro.idioma)) push("idiomas", item.libro.idioma); if (!TIPOS_PUB.includes(item.libro.tipoPublicacion)) push("tiposPublicacion", item.libro.tipoPublicacion); }
     if (item.armario && item.ubicacion && !((S.listas.armarios || {})[item.ubicacion] || []).includes(item.armario)) (arms[item.ubicacion] ||= new Set()).add(item.armario);
   }
   if (!Object.keys(add).length && !Object.keys(arms).length) return;
@@ -237,7 +264,7 @@ export function filtrar(list, f) {
     if (f.estado === "activos" && i.estado === "De baja") return false;
     if (f.estado && f.estado !== "activos" && f.estado !== "todos" && i.estado !== f.estado) return false;
     if (qs.length) {
-      const hay = norm([i.ref, i.denominacion, i.especificacion, i.marca, i.ubicacion, i.armario, i.categoria, i.proveedor, i.codigoProveedor, i.factura, i.observaciones, i.reactivo?.cas, i.reactivo?.formula, i.reactivo?.refFabricante].join(" "));
+      const hay = norm([i.ref, i.denominacion, i.especificacion, i.marca, i.ubicacion, i.armario, i.categoria, i.proveedor, i.codigoProveedor, i.factura, i.observaciones, i.reactivo?.cas, i.reactivo?.formula, i.reactivo?.refFabricante, i.libro?.isbn, i.libro?.subtitulo, i.libro?.autores, i.libro?.editorial, i.libro?.anio, i.libro?.materia].join(" "));
       if (!qs.every(q => hay.includes(q))) return false;
     }
     return true;
@@ -260,7 +287,7 @@ export function estadoPill(e) { return `<span class="pill ${e === "De baja" ? "b
 
 export function filterBar(f, prefix) {
   return `<div class="toolbar">
-    <div><label for="${prefix}q">Buscar</label><input id="${prefix}q" type="search" value="${esc(f.q)}" placeholder="Nombre, referencia, marca, proveedor, CAS…"></div>
+    <div><label for="${prefix}q">Buscar</label><input id="${prefix}q" type="search" value="${esc(f.q)}" placeholder="Nombre, referencia, marca, CAS, ISBN, autor…"></div>
     <div><label for="${prefix}tipo">Tipo</label>${sel(prefix + "tipo", TIPOS, f.tipo, "Todos")}</div>
     <div><label for="${prefix}cat">Categoría</label>${sel(prefix + "cat", opts("categorias", "categoria"), f.cat, "Todas")}</div>
     <div><label for="${prefix}ubic">Ubicación</label>${sel(prefix + "ubic", opts("ubicaciones", "ubicacion"), f.ubic, "Todas")}</div>
@@ -274,13 +301,14 @@ export function bindFilters(f, prefix, cb) {
 
 /* ---------- fichas ---------- */
 export function blank(tipo) {
-  const i = { id: newId(), ref: "", tipo: TIPOS.includes(tipo) ? tipo : "Material de laboratorio reutilizable", categoria: "", denominacion: "", especificacion: "", marca: "", cantidad: 1, cantidadIndeterminada: false, ubicacion: "", armario: "", estado: "Operativo", origen: "Compra", proveedor: "", codigoProveedor: "", factura: "", precio: null, fechaAlta: today(), fechaBaja: "", motivoBaja: "", observaciones: "", historial: [] };
+  const i = { id: newId(), ref: "", tipo: TIPOS.includes(tipo) ? tipo : "Material de laboratorio reutilizable", categoria: tipo === LIBRO ? "Biblioteca" : "", denominacion: "", especificacion: "", marca: "", cantidad: 1, cantidadIndeterminada: false, ubicacion: "", armario: "", estado: "Operativo", origen: "Compra", proveedor: "", codigoProveedor: "", factura: "", precio: null, fechaAlta: today(), fechaBaja: "", motivoBaja: "", observaciones: "", historial: [] };
   return ensureSub(i);
 }
 export function ensureSub(i) {
   if (i.tipo === "Reactivos") { i.reactivo ||= { formula: "", cas: "", fabricante: "", refFabricante: "", lote: "", concentracion: "", estadoFisico: "", envase: "", cantidadRestante: "", pictogramas: [], frasesHP: "", armarioSeguridad: "", fechaApertura: "", fechaCaducidad: "", fds: "", stockMinimo: null }; i.reactivo.pictogramas ||= []; }
   if (i.tipo === "Material fungible") i.fungible ||= { unidadStock: "", unidadesEnvase: null, stockMinimo: null, caducidad: "" };
   if (i.tipo === "Colecciones") { i.coleccion ||= { tipoColeccion: "", nEjemplares: null, ejemplares: [] }; i.coleccion.ejemplares ||= []; }
+  if (i.tipo === LIBRO) { i.libro ||= { isbn: "", subtitulo: "", autores: "", editorial: "", anio: "", edicion: "", idioma: "", tipoPublicacion: "", materia: "", niveles: [], portada: "", ejemplares: [] }; i.libro.niveles ||= []; i.libro.ejemplares ||= []; }
   return i;
 }
 export const fld = (id, lab, val, extra = "", cls = "") => `<div class="${cls}"><label for="${id}">${lab}</label><input id="${id}" value="${esc(val ?? "")}" ${extra}></div>`;
@@ -307,6 +335,7 @@ export function avisos() {
     ...act.filter(i => !i.ubicacion).map(i => [i, "sin ubicación"]),
     ...act.filter(i => i.cantidad == null && !i.cantidadIndeterminada).map(i => [i, "sin cantidad"]),
     ...act.filter(i => i.reactivo?.cas && !casValido(i.reactivo.cas)).map(i => [i, `CAS ${i.reactivo.cas} no válido`]),
+    ...act.filter(i => i.libro?.isbn && !isbnValido(i.libro.isbn)).map(i => [i, `ISBN / ISSN ${i.libro.isbn} no válido`]),
     ...items().filter(i => i.estado === "De baja" && (!i.fechaBaja || !i.motivoBaja)).map(i => [i, "baja sin fecha o sin motivo"]),
     ...items().filter(i => normFecha(i.fechaAlta) === null || normFecha(i.fechaBaja) === null).map(i => [i, "fecha con formato no reconocido"])
   ];
