@@ -166,3 +166,16 @@ pre.ocr{white-space:pre-wrap;font:.78rem/1.35 var(--mono);color:var(--muted);bac
 .chip .sub{font-size:.75rem}
 .chip[aria-pressed=true] .sub{color:inherit;opacity:.85}
 details>summary{cursor:pointer;color:var(--accent);margin:4px 0}
+
+/* v1.3 · Libros */
+.lb-t td{vertical-align:middle}
+.lb-t input{min-width:90px}
+.lb-t td:nth-child(3) input{min-width:220px}
+.lb-t td:nth-child(4) input{min-width:180px}
+.lb-cov{width:44px}
+.lb-cov img{display:block;width:36px;max-height:54px;object-fit:contain;border-radius:3px}
+img.lb-cover{display:block;max-width:120px;max-height:180px;margin-top:10px;border:1px solid var(--line);border-radius:4px}
+@media print{
+  .p-apa h2{font-size:13pt}
+  .p-apa .apa p{margin:0 0 6pt;padding-left:12mm;text-indent:-12mm;font-size:10.5pt;line-height:1.5;break-inside:avoid}
+}

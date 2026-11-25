@@ -1,7 +1,8 @@
-// Inventario del Departamento — vistas de catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes (v1.2)
+// Inventario del Departamento — vistas de catálogo de reactivos, importación (PDF, CSV, lista), listados y ajustes (v1.3)
 
 import { VERSION, $, $$, esc, norm, uniq, today, nowISO, finMes, TIPOS, ESTADOS, S, store, commit, sync, guard, who, items, opts, dl, sel, ghsSvg, label, learn, normFecha, cursoActual,
-  filtrar, ordenar, cant, filterBar, bindFilters, blank, ensureSub, fld, mismo, minimo, bajoMinimo, download, parseCSV, fillWho } from "./core.js";
+  filtrar, ordenar, cant, filterBar, bindFilters, blank, ensureSub, fld, mismo, minimo, bajoMinimo, download, parseCSV, fillWho, LIBRO, isbnValido, isbnNorm } from "./core.js";
+import { apa, ris, tituloCompleto, autorOrden } from "./libros.js";
 import { xlsxBlob } from "./xlsx-mini.js";
 
 /* ---------- vista: catálogo de reactivos ---------- */
@@ -49,10 +50,12 @@ export function vCatalogo(c) {
 }
 
 /* ---------- vista: importar ---------- */
-const CAMPOS = [["ref", "N.º referencia"], ["denominacion", "Denominación *"], ["especificacion", "Especificación"], ["marca", "Marca / modelo"], ["cantidad", "Cantidad"], ["cantidadIndeterminada", "Cantidad indeterminada (Sí)"], ["ubicacion", "Ubicación"], ["armario", "Armario"], ["tipo", "Tipo de registro"], ["categoria", "Categoría"], ["estado", "Estado"], ["origen", "Origen (Compra / Dotación)"], ["fechaAlta", "Fecha de alta"], ["fechaBaja", "Fecha de baja"], ["motivoBaja", "Motivo de baja"], ["codigoProveedor", "Código de artículo del proveedor"], ["precio", "Precio unitario"], ["observaciones", "Observaciones"], ["r.cas", "CAS (reactivos)"], ["r.formula", "Fórmula (reactivos)"], ["r.fabricante", "Fabricante (reactivos)"], ["r.refFabricante", "Código del fabricante (reactivos)"], ["r.lote", "Lote (reactivos)"], ["r.envase", "Envase (reactivos)"], ["r.fechaCaducidad", "Caducidad (reactivos)"], ["r.armarioSeguridad", "Armario de seguridad (reactivos)"], ["r.pictogramas", "Pictogramas SGA (reactivos)"]];
+const CAMPOS = [["ref", "N.º referencia"], ["denominacion", "Denominación *"], ["especificacion", "Especificación"], ["marca", "Marca / modelo"], ["cantidad", "Cantidad"], ["cantidadIndeterminada", "Cantidad indeterminada (Sí)"], ["ubicacion", "Ubicación"], ["armario", "Armario"], ["tipo", "Tipo de registro"], ["categoria", "Categoría"], ["estado", "Estado"], ["origen", "Origen (Compra / Dotación)"], ["fechaAlta", "Fecha de alta"], ["fechaBaja", "Fecha de baja"], ["motivoBaja", "Motivo de baja"], ["codigoProveedor", "Código de artículo del proveedor"], ["precio", "Precio unitario"], ["observaciones", "Observaciones"], ["r.cas", "CAS (reactivos)"], ["r.formula", "Fórmula (reactivos)"], ["r.fabricante", "Fabricante (reactivos)"], ["r.refFabricante", "Código del fabricante (reactivos)"], ["r.lote", "Lote (reactivos)"], ["r.envase", "Envase (reactivos)"], ["r.fechaCaducidad", "Caducidad (reactivos)"], ["r.armarioSeguridad", "Armario de seguridad (reactivos)"], ["r.pictogramas", "Pictogramas SGA (reactivos)"],
+  ["b.isbn", "ISBN / ISSN (libros)"], ["b.autores", "Autores (libros)"], ["b.editorial", "Editorial (libros)"], ["b.anio", "Año (libros)"], ["b.edicion", "Edición (libros)"], ["b.idioma", "Idioma (libros)"], ["b.materia", "Materia (libros)"], ["b.tipoPublicacion", "Tipo de publicación (libros)"]];
 // Nombres de columna habituales para proponer la correspondencia (primero coincidencia exacta; después, por comienzo)
-const SIN = { ref: ["n.º referencia", "nº referencia", "n. referencia", "referencia", "n.º ref.", "ref.", "ref"], denominacion: ["denominacion", "descripcion", "articulo", "concepto", "material", "producto", "nombre"], especificacion: ["especificacion"], marca: ["marca"], cantidad: ["cantidad", "unidades", "uds", "ud.", "cant"], cantidadIndeterminada: ["cantidad indeterminada"], ubicacion: ["ubicacion"], armario: ["armario"], tipo: ["tipo de registro", "tipo"], categoria: ["categoria"], estado: ["estado"], origen: ["origen", "dotacion / compra", "dotacion/compra", "dotacion"], fechaAlta: ["fecha de alta", "fecha alta", "f. alta"], fechaBaja: ["fecha de baja", "fecha baja", "f. baja"], motivoBaja: ["motivo de baja", "motivo"], codigoProveedor: ["codigo", "cod."], precio: ["precio unitario", "precio", "p. unit", "pvp"], observaciones: ["observaciones"], "r.cas": ["cas", "n.º cas"], "r.formula": ["formula"],
-  "r.fabricante": ["fabricante"], "r.refFabricante": ["referencia del fabricante", "codigo del fabricante", "ref. fabricante"], "r.lote": ["lote", "n.º de lote", "lot"], "r.envase": ["envase", "envase y contenido", "contenido"], "r.fechaCaducidad": ["caducidad", "fecha de caducidad"], "r.armarioSeguridad": ["armario de seguridad"], "r.pictogramas": ["pictogramas", "pictogramas sga"] };
+const SIN = { ref: ["n.º referencia", "nº referencia", "n. referencia", "referencia", "n.º ref.", "ref.", "ref"], denominacion: ["denominacion", "descripcion", "articulo", "concepto", "material", "producto", "nombre", "titulo", "title"], especificacion: ["especificacion"], marca: ["marca"], cantidad: ["cantidad", "unidades", "uds", "ud.", "cant"], cantidadIndeterminada: ["cantidad indeterminada"], ubicacion: ["ubicacion"], armario: ["armario"], tipo: ["tipo de registro", "tipo"], categoria: ["categoria"], estado: ["estado"], origen: ["origen", "dotacion / compra", "dotacion/compra", "dotacion"], fechaAlta: ["fecha de alta", "fecha alta", "f. alta"], fechaBaja: ["fecha de baja", "fecha baja", "f. baja"], motivoBaja: ["motivo de baja", "motivo"], codigoProveedor: ["codigo", "cod."], precio: ["precio unitario", "precio", "p. unit", "pvp"], observaciones: ["observaciones"], "r.cas": ["cas", "n.º cas"], "r.formula": ["formula"],
+  "r.fabricante": ["fabricante"], "r.refFabricante": ["referencia del fabricante", "codigo del fabricante", "ref. fabricante"], "r.lote": ["lote", "n.º de lote", "lot"], "r.envase": ["envase", "envase y contenido", "contenido"], "r.fechaCaducidad": ["caducidad", "fecha de caducidad"], "r.armarioSeguridad": ["armario de seguridad"], "r.pictogramas": ["pictogramas", "pictogramas sga"],
+  "b.isbn": ["isbn", "issn", "isbn/issn", "isbn / issn"], "b.autores": ["autores", "autor", "author", "authors"], "b.editorial": ["editorial", "publisher"], "b.anio": ["ano", "anio", "year", "publication year", "ano de edicion"], "b.edicion": ["edicion", "edition"], "b.idioma": ["idioma", "lengua", "language"], "b.materia": ["materia", "tema"], "b.tipoPublicacion": ["tipo de publicacion"] };
 const CAB = ["denominacion", "descripcion", "articulo", "concepto", "cantidad", "unidades", "ubicacion", "referencia", "n.º ref", "codigo", "precio", "importe"];
 const numero = s => { const t = String(s).replace(/[\s€]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."); return t !== "" && isFinite(+t) ? +t : null; };
 const frase = s => /[A-ZÁÉÍÓÚÑ]/.test(s) && s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLowerCase() : s;
@@ -152,6 +155,13 @@ export function vImportar(c) {
             fechaCaducidad: finMes(cad || ""), armarioSeguridad: get(r, "r.armarioSeguridad"), pictogramas: uniq(get(r, "r.pictogramas").toUpperCase().match(/GHS0\d/g) || []) });
           if (cad === null) i.observaciones = [i.observaciones, `Caducidad original: ${get(r, "r.fechaCaducidad")}`].filter(Boolean).join(" · ");
         }
+        if (i.libro) {
+          const isbn = get(r, "b.isbn");
+          // en exportaciones de Zotero o LibraryThing los autores van separados por «;» o «,»; se respeta el «;»
+          Object.assign(i.libro, { isbn: isbn && isbnValido(isbn) ? isbnNorm(isbn) : isbn, autores: get(r, "b.autores").split(/\s*;\s*/).filter(Boolean).map(autorOrden).join("; "), editorial: get(r, "b.editorial"),
+            anio: (/\d{4}/.exec(get(r, "b.anio")) || [""])[0], edicion: get(r, "b.edicion"), idioma: get(r, "b.idioma"), materia: get(r, "b.materia"), tipoPublicacion: get(r, "b.tipoPublicacion") });
+          if (!i.categoria) i.categoria = "Biblioteca";
+        }
         nuevos.push(i);
       }
       if (minus) nuevos.forEach(i => { i.denominacion = frase(i.denominacion); });
@@ -193,9 +203,13 @@ const FORMATOS = {
   reactivos: { t: "Reactivos", filtro: i => i.tipo === "Reactivos", cols: [["Reactivo", i => i.denominacion], ["Fórmula", i => i.reactivo?.formula], ["CAS", i => i.reactivo?.cas], ["Envase", i => i.reactivo?.envase], ["N.º envases", cant], ["Ubicación", lugar], ["Armario de seguridad", i => i.reactivo?.armarioSeguridad], ["Pictogramas", i => (i.reactivo?.pictogramas || []).join(" ")], ["Caducidad", i => i.reactivo?.fechaCaducidad], ["Observaciones", i => i.observaciones]] },
   fungible: { t: "Material fungible", filtro: i => i.tipo === "Material fungible", cols: [["Denominación", label], ["Cantidad", cant], ["Unidad", i => i.fungible?.unidadStock], ["Uds. por envase", i => i.fungible?.unidadesEnvase], ["Stock mínimo", i => i.fungible?.stockMinimo], ["Caducidad", i => i.fungible?.caducidad], ["Ubicación", lugar], ["Proveedor", i => i.proveedor]] },
   reposicion: { t: "Reposición (por debajo del mínimo)", filtro: bajoMinimo, cols: [["Denominación", label], ["Tipo", i => i.tipo], ["Cantidad actual", cant], ["Stock mínimo", minimo], ["Unidad / envase", i => i.fungible?.unidadStock || i.reactivo?.envase], ["Proveedor", i => i.proveedor], ["Código proveedor", i => i.codigoProveedor], ["Ubicación", lugar]] },
+  biblioteca: { t: "Biblioteca del departamento", filtro: i => i.tipo === LIBRO, cols: [["Título", tituloCompleto], ["Autores", i => i.libro?.autores], ["Editorial", i => i.libro?.editorial], ["Año", i => i.libro?.anio], ["Edición", i => i.libro?.edicion], ["ISBN / ISSN", i => i.libro?.isbn], ["Idioma", i => i.libro?.idioma], ["Tipo", i => i.libro?.tipoPublicacion], ["Materia", i => i.libro?.materia], ["Nivel", i => (i.libro?.niveles || []).join(", ")], ["Ejemplares", cant], ["Ubicación", lugar]] },
+  apa: { t: "Bibliografía (APA 7)", filtro: i => i.tipo === LIBRO, cols: [["Referencia (APA 7)", i => apa(i).texto]] },
   colecciones: { t: "Colecciones con ejemplares", filtro: i => i.tipo === "Colecciones", cols: [["Colección / ejemplar", i => i._ej ? "   " + [i._ej.n, i._ej.nombre].filter(Boolean).join(" · ") : label(i)], ["Tipo / clasificación", i => i._ej ? i._ej.clasificacion : i.coleccion?.tipoColeccion], ["N.º ejemplares / localidad", i => i._ej ? i._ej.localidad : (i.coleccion?.ejemplares?.length || i.coleccion?.nEjemplares || "")], ["Edad", i => i._ej?.edad], ["Estado", i => i._ej ? i._ej.estado : i.estado], ["Ubicación", i => i._ej ? "" : lugar(i)]] }
 };
-const GRUPOS = { "": "Sin agrupar", ubicacion: "Ubicación", categoria: "Categoría", tipo: "Tipo de registro" };
+const GRUPOS = { "": "Sin agrupar", ubicacion: "Ubicación", categoria: "Categoría", tipo: "Tipo de registro", materia: "Materia (libros)", tipoPublicacion: "Tipo de publicación (libros)" };
+// Los dos últimos agrupamientos leen datos de la ficha de libro
+const gval = (i, g) => (g === "materia" || g === "tipoPublicacion" ? i.libro?.[g] : i[g]) ?? "";
 const ORDENES = { denominacion: "Denominación", ref: "N.º de referencia", ubicacion: "Ubicación", categoria: "Categoría", fechaAlta: "Fecha de alta", fechaBaja: "Fecha de baja" };
 
 export function vListados(c, preset) {
@@ -211,7 +225,7 @@ export function vListados(c, preset) {
     <div><label for="l-campo">Filtrar por fecha de</label><select id="l-campo"><option value="fechaAlta">alta</option><option value="fechaBaja">baja</option></select></div>
     ${fld("l-desde", "Desde", "", 'type="date"')}${fld("l-hasta", "Hasta", "", 'type="date"')}</div>
    <label class="check"><input type="checkbox" id="l-bc"> Añadir también las bajas del curso ${cl} (con su fecha de baja)</label>
-   <div class="row" style="margin-top:10px"><button class="btn" id="l-pdf" type="button">PDF / imprimir</button><button class="btn ghost" id="l-xlsx" type="button">Excel</button><button class="btn ghost" id="l-csv" type="button">CSV</button><span class="muted small" id="l-n"></span></div>
+   <div class="row" style="margin-top:10px"><button class="btn" id="l-pdf" type="button">PDF / imprimir</button><button class="btn ghost" id="l-xlsx" type="button">Excel</button><button class="btn ghost" id="l-csv" type="button">CSV</button><button class="btn ghost" id="l-ris" type="button" title="Para Zotero, Mendeley o EndNote" hidden>RIS (Zotero)</button><span class="muted small" id="l-n"></span></div>
    <p class="muted small">Para el PDF, elige «Guardar como PDF» en la ventana de impresión. Sale en horizontal.</p>
    <div class="tablewrap" style="margin-top:10px"><table id="l-prev"></table></div>`;
   const rows = () => {
@@ -221,21 +235,22 @@ export function vListados(c, preset) {
     if (desde) l = l.filter(i => (i[campoFecha] || "") >= desde); if (hasta) l = l.filter(i => i[campoFecha] && i[campoFecha] <= hasta);
     if (FORMATOS[fmt].filtro) l = l.filter(FORMATOS[fmt].filtro);
     l = ordenar(l, { k: ordenK, dir: 1 });
-    if (grupo) l.sort((a, b) => String(a[grupo] ?? "").localeCompare(String(b[grupo] ?? ""), "es", { numeric: true }));
+    if (fmt === "apa") { const vistos = new Set(); l = l.map(i => [i, apa(i).texto]).filter(([, t]) => !vistos.has(t) && vistos.add(t)).sort((a, b) => a[1].localeCompare(b[1], "es", { sensitivity: "base" })).map(([i]) => i); } // el mismo libro en dos ubicaciones sale una sola vez
+    if (grupo) l.sort((a, b) => String(gval(a, grupo)).localeCompare(String(gval(b, grupo)), "es", { numeric: true }));
     if (fmt === "colecciones") l = l.flatMap(i => [i, ...(i.coleccion?.ejemplares || []).map(e => ({ ...i, _ej: e }))]);
     return l;
   };
   const table = l => {
     const cols = FORMATOS[fmt].cols, n = {}; let prev;
-    if (grupo) for (const i of l) n[i[grupo] ?? ""] = (n[i[grupo] ?? ""] || 0) + 1;
+    if (grupo) for (const i of l) n[gval(i, grupo)] = (n[gval(i, grupo)] || 0) + 1;
     return `<thead><tr>${cols.map(([t]) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${l.map(i => {
-      const k = i[grupo] ?? "", cab = grupo && k !== prev ? `<tr class="grp"><td colspan="${cols.length}">${esc(GRUPOS[grupo])}: ${esc(k || "(sin indicar)")} · ${n[k]} líneas</td></tr>` : ""; prev = k;
+      const k = gval(i, grupo), cab = grupo && k !== prev ? `<tr class="grp"><td colspan="${cols.length}">${esc(GRUPOS[grupo])}: ${esc(k || "(sin indicar)")} · ${n[k]} líneas</td></tr>` : ""; prev = k;
       return `${cab}<tr>${cols.map(([, g]) => `<td>${esc(g(i) ?? "")}</td>`).join("")}</tr>`;
     }).join("")}</tbody>`;
   };
   const uds = l => l.reduce((s, i) => s + (i._ej || i.cantidadIndeterminada ? 0 : +i.cantidad || 0), 0);
   const draw = () => { const l = rows(); $("#l-n").textContent = `${l.length} líneas · ${uds(l)} unidades`; $("#l-prev").innerHTML = table(l.slice(0, 60)) + (l.length > 60 ? `<tfoot><tr><td colspan="${FORMATOS[fmt].cols.length}" class="muted">Vista previa de las primeras 60 líneas de ${l.length}.</td></tr></tfoot>` : "") || ""; };
-  const pinta = () => { $("#l-fmt").value = fmt; $("#l-grupo").value = grupo; $("#l-orden").value = ordenK; $("#l-campo").value = campoFecha; $("#l-desde").value = desde; $("#l-hasta").value = hasta; $("#l-bc").checked = bajasCurso; $("#l-estado").value = f.estado; $("#l-tipo").value = f.tipo; draw(); };
+  const pinta = () => { $("#l-ris").hidden = !["biblioteca", "apa"].includes(fmt); $("#l-fmt").value = fmt; $("#l-grupo").value = grupo; $("#l-orden").value = ordenK; $("#l-campo").value = campoFecha; $("#l-desde").value = desde; $("#l-hasta").value = hasta; $("#l-bc").checked = bajasCurso; $("#l-estado").value = f.estado; $("#l-tipo").value = f.tipo; draw(); };
   bindFilters(f, "l-", draw);
   $("#l-fmt").onchange = e => { fmt = e.target.value; grupo = FORMATOS[fmt].grupo || ""; pinta(); };
   $("#l-grupo").onchange = e => { grupo = e.target.value; draw(); };
@@ -252,12 +267,15 @@ export function vListados(c, preset) {
   const matrix = () => { const cols = FORMATOS[fmt].cols; return [cols.map(([t]) => t), ...rows().map(i => cols.map(([, g]) => { const v = g(i); return v == null ? "" : v; }))]; };
   const fname = ext => `inventario-${fmt}-${today()}.${ext}`;
   $("#l-csv").onclick = () => download(fname("csv"), "﻿" + matrix().map(r => r.map(v => /[;"\n\r]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(";")).join("\r\n"), "text/csv;charset=utf-8");
+  $("#l-ris").onclick = () => download(fname("ris"), ris(rows()), "application/x-research-info-systems");
   $("#l-xlsx").onclick = () => download(fname("xlsx"), xlsxBlob(matrix(), FORMATOS[fmt].t));
   $("#l-pdf").onclick = () => {
     const ce = S.listas.centro || {}; const l = rows();
     const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
     const filtrosTxt = [f.q && `«${f.q}»`, f.tipo, f.cat, f.ubic, f.estado === "activos" ? (bajasCurso ? `en uso y bajas del curso ${cl}` : "en uso") : f.estado === "todos" ? "" : f.estado, desde && `desde ${desde}`, hasta && `hasta ${hasta}`].filter(Boolean).join(" · ");
-    $("#print-area").innerHTML = fmt === "secretaria"
+    $("#print-area").innerHTML = fmt === "apa"
+      ? `<div class="p-apa"><h2>Bibliografía · ${esc(ce.departamento || "")}${ce.nombre ? " · " + esc(ce.nombre) : ""}</h2><p class="small">${esc(fecha)} · ${l.length} referencias (APA 7)${filtrosTxt ? " · " + esc(filtrosTxt) : ""}</p><div class="apa">${l.map(i => `<p>${apa(i).html}</p>`).join("")}</div></div>`
+      : fmt === "secretaria"
       ? `<div class="p-head"><div><strong>INVENTARIO ${esc((ce.nombre || "").toUpperCase())}</strong><br>Departamento: <strong>${esc(ce.departamento)}</strong><br>${esc(fecha)}${filtrosTxt ? `<br><small>${esc(filtrosTxt)}</small>` : ""}</div><div>Jefe/a de Departamento: <strong>${esc(ce.jefeDepartamento)}</strong><br><br>Firma:</div></div><table>${table(l)}</table>`
       : `<h2>${esc(FORMATOS[fmt].t)} · ${esc(ce.nombre)} · ${esc(ce.departamento)}</h2><p>${esc(fecha)} · ${l.length} líneas${filtrosTxt ? " · " + esc(filtrosTxt) : ""}${fmt === "recuento" ? " · Comprobado por: ____________________  Fecha: ____________" : ""}</p><table class="${fmt === "recuento" ? "recuento" : ""}">${table(l)}</table>`;
     window.print();
@@ -268,7 +286,7 @@ export function vListados(c, preset) {
 /* ---------- vista: ajustes ---------- */
 export function vAjustes(c) {
   const L = S.listas, ce = L.centro || {};
-  const listas = [["personas", "Personas del departamento («Registrado por»)"], ["ubicaciones", "Ubicaciones"], ["categorias", "Categorías"], ["motivosBaja", "Motivos de baja"], ["proveedores", "Proveedores"], ["fabricantes", "Fabricantes de reactivos"], ["armariosSeguridad", "Armarios de seguridad"], ["unidadesStock", "Unidades de stock (fungible)"], ["concentraciones", "Concentraciones"], ["tiposColeccion", "Tipos de colección"]];
+  const listas = [["personas", "Personas del departamento («Registrado por»)"], ["ubicaciones", "Ubicaciones"], ["categorias", "Categorías"], ["motivosBaja", "Motivos de baja"], ["proveedores", "Proveedores"], ["fabricantes", "Fabricantes de reactivos"], ["armariosSeguridad", "Armarios de seguridad"], ["unidadesStock", "Unidades de stock (fungible)"], ["concentraciones", "Concentraciones"], ["tiposColeccion", "Tipos de colección"], ["editoriales", "Editoriales (libros)"], ["materias", "Materias (libros)"], ["tiposPublicacion", "Tipos de publicación propios (libros)"], ["idiomas", "Idiomas adicionales (libros)"]];
   c.innerHTML = `<h1>Ajustes</h1>
   <form class="sheet" id="f-aj"><h2>Centro (cabecera de los listados)</h2><div class="grid">${fld("a-nombre", "Centro", ce.nombre)}${fld("a-dep", "Departamento", ce.departamento)}${fld("a-jefe", "Jefe/a de departamento", ce.jefeDepartamento)}</div>
   <h2 style="margin-top:18px">Valores de los desplegables</h2><p class="muted small">Uno por línea. Los valores nuevos que se escriben en las fichas se añaden aquí solos.</p>

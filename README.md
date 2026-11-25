@@ -1,6 +1,6 @@
 # Inventario del Departamento de Biología y Geología
 
-Aplicación web del inventario de material, equipos, reactivos y colecciones del Departamento de Biología y Geología del IES L'Eliana.
+Aplicación web del inventario de material, equipos, reactivos, colecciones y biblioteca del Departamento de Biología y Geología del IES L'Eliana.
 
 - **Este repositorio es público y no contiene datos.** Solo tiene el código de la app, que se publica con GitHub Pages.
 - Los datos están en el repositorio privado `biogeo-iesleliana/inventario-datos`.
@@ -17,6 +17,7 @@ Aplicación web del inventario de material, equipos, reactivos y colecciones del
 | `js/xlsx-mini.js` | Generador de archivos Excel propio (sin librerías externas) |
 | `js/pdf-import.js` | Lectura local de PDF y reconstrucción de las columnas |
 | `js/foto.js` | Alta de reactivos por foto de la etiqueta |
+| `js/libros.js` | Biblioteca del departamento: búsqueda por ISBN (Open Library y Google Books), lectura del código de barras, bibliografía APA y RIS |
 | `js/etiqueta.js` | Interpretación del texto de la etiqueta: código del fabricante, CAS, lote, caducidad, envase y nombre |
 | `vendor/` | PDF.js (Mozilla, licencia Apache 2.0). Solo se carga al importar un PDF |
 | `vendor/tesseract/` | Lector de etiquetas (Tesseract.js y datos de español e inglés, Apache 2.0). Solo se carga en «Alta por foto». Ver `vendor/tesseract/LEEME.md` |
@@ -24,7 +25,7 @@ Aplicación web del inventario de material, equipos, reactivos y colecciones del
 | `config.json` | Organización, repositorio de datos, token cifrado y fecha de caducidad. Se genera desde «Configurar el acceso» |
 | `.nojekyll` | Indica a GitHub Pages que publique los archivos tal cual |
 
-La app no carga nada de terceros: solo sus propios archivos y la API de GitHub (lo impone la política de seguridad de `index.html`).
+La app no carga código de terceros: solo sus propios archivos. Solo se conecta con la API de GitHub y, para buscar libros por ISBN, con Open Library y Google Books, de donde también muestra las portadas (lo impone la política de seguridad de `index.html`). A esos dos servicios solo se les envía el ISBN.
 
 ## Cambiar la contraseña o renovar el token
 1. Entra en la app y ve a **Ajustes → Configurar el acceso** (o abre la app con `#configurar` al final de la dirección).
